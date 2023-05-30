@@ -1,4 +1,7 @@
 #include "scene.h"
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
 
 #include <obj/load.h>
 #include <obj/draw.h>
@@ -9,9 +12,9 @@ void init_scene(Scene* scene, Objects* objects)
 	
 	scene->fan_rotation = 0;
 
-	scene->lighting_level = 0.5;
+	//scene->lighting_level = 0.5;
 	
-	init_car(&(scene->car));
+	init_vehicles(&(scene->vehicles));
 	 
 	load_model(&(scene->windturbine), "assets/models/windturbine.obj");
 	scene->fan_texture_id = load_texture("assets/textures/head.jpg");
@@ -32,6 +35,16 @@ void init_scene(Scene* scene, Objects* objects)
 	
 	load_model(&(scene->bush), "assets/models/bush.obj");
     scene->bush_texture_id = load_texture("assets/textures/bush.jpg");
+	
+	load_model(&(scene->stop), "assets/models/stop.obj");
+    scene->stop_texture_id = load_texture("assets/textures/stop.png");
+	
+	load_model(&(scene->pedestriantable), "assets/models/pedestriantable.obj");
+    scene->pedestriantable_texture_id = load_texture("assets/textures/pedestriantable.png");
+	
+	load_model(&(scene->barrier), "assets/models/barrier.obj");
+    scene->barrier_texture_id = load_texture("assets/textures/barrier.png");
+	
 	
 
     scene->material.ambient.red = 0.0;
@@ -100,21 +113,38 @@ void set_material(const Material* material)
     glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, &(material->shininess));
 }
 
-void update_scene(Scene* scene, double time)
+void update_scene(Scene* scene, double times)
 {
-	scene->fan_rotation += 2000*time;
+    static bool initialized = false;
+    static double previous_speed = 0.0;
+    static double elapsed_time = 0.0;
 
+    if (!initialized) {
+        srand(time(NULL));
+        initialized = true;
+    }
+
+    elapsed_time += times;
+
+    double speed_fraction = ((double)rand() / RAND_MAX) * 0.2 - 0.1;
+
+    double random_speed_increment = (previous_speed * speed_fraction) + ((double)rand() / RAND_MAX) * 35 + 15;
+
+    double random_speed = previous_speed + random_speed_increment;
+
+    double clamped_speed = random_speed > 5000 ? 5000 : (random_speed < 1500 ? 1500 : random_speed);
+
+    double smoothed_speed = (previous_speed + clamped_speed) / 2.0;
+
+    scene->fan_rotation += smoothed_speed * times;
+    previous_speed = smoothed_speed;
 }
+
+
 
 void render_scene(const Scene* scene, const Objects* objects)
 {
-	glPushMatrix();
-    //glTranslatef(scene->plane.position.x, scene->plane.position.y, scene->plane.position.z+10);
-    //glScalef(0.1,0.1,0.1);
-    glRotatef(180,0,0,1);
-    glBindTexture(GL_TEXTURE_2D, scene->car.plane_texture_id);
-	draw_model(&(scene->car.plane));
-    glPopMatrix();
+
 	
 float turbine_spacing = 4.5; // Távolság a szélerőművek között
 float head_offset = 0.05; // Fej eltolásának mértéke
@@ -144,11 +174,11 @@ for (int i = 0; i < 5; i++) {
     set_lighting(scene->lighting_level);
 
 	glPushMatrix();
-    glTranslatef((scene->car.position.x)+0.09, scene->car.position.y-0.01, scene->car.position.z+0.27);
+    glTranslatef((scene->vehicles.position.x)+0.09, scene->vehicles.position.y-0.01, scene->vehicles.position.z+0.27);
     glScalef(0.7,0.7,0.7);
     glRotatef(90,0, 0, 1);
-    glBindTexture(GL_TEXTURE_2D, scene->car.helmet_texture_id);
-	draw_model(&(scene->car.helmet));
+    glBindTexture(GL_TEXTURE_2D, scene->vehicles.helmet_texture_id);
+	draw_model(&(scene->vehicles.helmet));
     glPopMatrix();
 	
 	glPushMatrix();
@@ -156,16 +186,16 @@ for (int i = 0; i < 5; i++) {
     glScalef(0.3,0.3,0.3);
     glRotatef(180,0,0,1);
 	glRotatef(90,1,0,0);
-    glBindTexture(GL_TEXTURE_2D, scene->car.stop_texture_id);
-	draw_model(&(scene->car.stop));
+    glBindTexture(GL_TEXTURE_2D, scene->stop_texture_id);
+	draw_model(&(scene->stop));
     glPopMatrix();
 	
 	glPushMatrix();
 	glTranslatef(-13,2.7,0);
     glScalef(0.3,0.3,0.3);
 	glRotatef(90,1,0,0);
-    glBindTexture(GL_TEXTURE_2D, scene->car.stop_texture_id);
-	draw_model(&(scene->car.stop));
+    glBindTexture(GL_TEXTURE_2D, scene->stop_texture_id);
+	draw_model(&(scene->stop));
     glPopMatrix();
 	
 	glPushMatrix();
@@ -174,8 +204,8 @@ for (int i = 0; i < 5; i++) {
 	glRotatef(90,1,0,0);
 	glRotatef(-90,0,1,0);
 
-    glBindTexture(GL_TEXTURE_2D, scene->car.pedestriantable_texture_id);
-	draw_model(&(scene->car.pedestriantable));
+    glBindTexture(GL_TEXTURE_2D, scene->pedestriantable_texture_id);
+	draw_model(&(scene->pedestriantable));
     glPopMatrix();
 	
 	glPushMatrix();
@@ -184,8 +214,8 @@ for (int i = 0; i < 5; i++) {
     glRotatef(180,0,0,1);
 	glRotatef(90,1,0,0);
 	glRotatef(-90,0,1,0);
-    glBindTexture(GL_TEXTURE_2D, scene->car.pedestriantable_texture_id);
-	draw_model(&(scene->car.pedestriantable));
+    glBindTexture(GL_TEXTURE_2D, scene->pedestriantable_texture_id);
+	draw_model(&(scene->pedestriantable));
     glPopMatrix();
 	
 glPushMatrix();
@@ -204,47 +234,52 @@ for (int i = -4; i < 3; i++) {
 
 glPopMatrix();	
 	
-	
-
+			glPushMatrix();
+    glTranslatef(scene->vehicles.p_position.x, scene->vehicles.p_position.y, scene->vehicles.p_position.z+10);
+    glScalef(0.1,0.1,0.1);
+    glRotatef(scene->vehicles.p_angle,scene->vehicles.p_rotation.x,scene->vehicles.p_rotation.y,scene->vehicles.p_rotation.z);
+    glBindTexture(GL_TEXTURE_2D, scene->vehicles.plane_texture_id);
+	draw_model(&(scene->vehicles.plane));
+    glPopMatrix();
 		
 		glPushMatrix();
-    glTranslatef(scene->car.position.x, scene->car.position.y, scene->car.position.z);
+    glTranslatef(scene->vehicles.position.x, scene->vehicles.position.y, scene->vehicles.position.z);
     glScalef(1,1,1);
     glRotatef(180,0,0,1);
-    glBindTexture(GL_TEXTURE_2D, scene->car.car_texture_id);
-	draw_model(&(scene->car.model));
+    glBindTexture(GL_TEXTURE_2D, scene->vehicles.vehicles_texture_id);
+	draw_model(&(scene->vehicles.model));
     glPopMatrix();
 
 	glPushMatrix();
-    glTranslatef((scene->car.position.x)-0.75, scene->car.position.y+0.32, scene->car.position.z+0.1);
+    glTranslatef((scene->vehicles.position.x)-0.75, scene->vehicles.position.y+0.32, scene->vehicles.position.z+0.1);
     glScalef(0.01,0.01,0.01);
-    glRotatef(scene->car.angle,0, 1, 0);
-    glBindTexture(GL_TEXTURE_2D, scene->car.tyre_texture_id);
-	draw_model(&(scene->car.tyre));
+    glRotatef(scene->vehicles.angle,0, 1, 0);
+    glBindTexture(GL_TEXTURE_2D, scene->vehicles.tyre_texture_id);
+	draw_model(&(scene->vehicles.tyre));
     glPopMatrix();
 	
 		glPushMatrix();
-    glTranslatef((scene->car.position.x)+0.59, scene->car.position.y+0.32, scene->car.position.z+0.1);
+    glTranslatef((scene->vehicles.position.x)+0.59, scene->vehicles.position.y+0.32, scene->vehicles.position.z+0.1);
     glScalef(0.01,0.01,0.01);
-    glRotatef(scene->car.angle,0, 1, 0);
-    glBindTexture(GL_TEXTURE_2D, scene->car.tyre_texture_id);
-	draw_model(&(scene->car.tyre));
+    glRotatef(scene->vehicles.angle,0, 1, 0);
+    glBindTexture(GL_TEXTURE_2D, scene->vehicles.tyre_texture_id);
+	draw_model(&(scene->vehicles.tyre));
     glPopMatrix();
 	
 	glPushMatrix();
-    glTranslatef((scene->car.position.x)+0.59, scene->car.position.y-0.32, scene->car.position.z+0.1);
+    glTranslatef((scene->vehicles.position.x)+0.59, scene->vehicles.position.y-0.32, scene->vehicles.position.z+0.1);
     glScalef(0.01,0.01,0.01);
-	glRotatef(scene->car.angle,0, 1, 0);
-    glBindTexture(GL_TEXTURE_2D, scene->car.tyre_texture_id);
-	draw_model(&(scene->car.tyre2));
+	glRotatef(scene->vehicles.angle,0, 1, 0);
+    glBindTexture(GL_TEXTURE_2D, scene->vehicles.tyre_texture_id);
+	draw_model(&(scene->vehicles.tyre2));
     glPopMatrix();
 	
 	glPushMatrix();
-    glTranslatef((scene->car.position.x)-0.75, scene->car.position.y-0.32, scene->car.position.z+0.1);
+    glTranslatef((scene->vehicles.position.x)-0.75, scene->vehicles.position.y-0.32, scene->vehicles.position.z+0.1);
     glScalef(0.01,0.01,0.01);
-	glRotatef(scene->car.angle,0, 1, 0);
-    glBindTexture(GL_TEXTURE_2D, scene->car.tyre_texture_id);
-	draw_model(&(scene->car.tyre2));
+	glRotatef(scene->vehicles.angle,0, 1, 0);
+    glBindTexture(GL_TEXTURE_2D, scene->vehicles.tyre_texture_id);
+	draw_model(&(scene->vehicles.tyre2));
     glPopMatrix();
 
 	glPushMatrix();
@@ -317,10 +352,10 @@ glPopMatrix();
 int i=0;
 for(i=0;i<2;i++){
     glPushMatrix();
-    glTranslatef(13, 1.5*i+0.25, 0); // hozzáadott tér
+    glTranslatef(12.5, 1.5*i+0.25, 0); // hozzáadott tér
     glScalef(0.6, 0.6, 0.6);
-    glBindTexture(GL_TEXTURE_2D, scene->car.barrier_texture_id);
-    draw_model(&(scene->car.barrier));
+    glBindTexture(GL_TEXTURE_2D, scene->barrier_texture_id);
+    draw_model(&(scene->barrier));
     glPopMatrix();
 }
 glPopMatrix();
@@ -330,10 +365,10 @@ glPopMatrix();
  i=0;
 for(i=0;i<2;i++){
     glPushMatrix();
-    glTranslatef(-13, 1.5*i+0.25, 0); // hozzáadott tér
+    glTranslatef(-12.5, 1.5*i+0.25, 0); // hozzáadott tér
     glScalef(0.6, 0.6, 0.6);
-    glBindTexture(GL_TEXTURE_2D, scene->car.barrier_texture_id);
-    draw_model(&(scene->car.barrier));
+    glBindTexture(GL_TEXTURE_2D, scene->barrier_texture_id);
+    draw_model(&(scene->barrier));
     glPopMatrix();
 }
 glPopMatrix();

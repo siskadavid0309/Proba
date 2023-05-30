@@ -1,5 +1,4 @@
 #include "app.h"
-//#include <unistd.h>
 
 #include <SDL2/SDL_image.h>
 
@@ -9,6 +8,8 @@ void init_app(App* app, int width, int height)
     int inited_loaders;
 
     app->is_running = false;
+	app->plane_start=false;
+	app->collision=false;
 
     error_code = SDL_Init(SDL_INIT_EVERYTHING);
     if (error_code != 0) {
@@ -141,6 +142,49 @@ void show_help_image()
     SDL_DestroyWindow(window);
 }
 
+void collision_image()
+{
+    SDL_Window* window = SDL_CreateWindow(
+        "Ütközés!",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        800, 600,
+        SDL_WINDOW_OPENGL);
+
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+
+    SDL_Surface* image = IMG_Load("assets/textures/collision.png");
+    if (image == NULL) {
+        printf("[ERROR] Failed to load help image: %s\n", IMG_GetError());
+        return;
+    }
+
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, image);
+    if (texture == NULL) {
+        printf("[ERROR] Failed to create texture from image: %s\n", SDL_GetError());
+        SDL_FreeSurface(image);
+        return;
+    }
+
+    SDL_FreeSurface(image);
+
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    SDL_RenderPresent(renderer);
+
+    bool is_running = true;
+    SDL_Event event;
+    while (is_running) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
+                is_running = false;
+            }
+        }
+    }
+
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+}
+
 void handle_app_events(App* app)
 {
 	
@@ -151,8 +195,9 @@ void handle_app_events(App* app)
     int x;
     int y;
 
+
 while (SDL_PollEvent(&event)) {
-    switch (event.type) {
+	switch (event.type) {
         case SDL_KEYDOWN:
             switch (event.key.keysym.scancode) {
                 case SDL_SCANCODE_ESCAPE:
@@ -165,22 +210,18 @@ while (SDL_PollEvent(&event)) {
                     set_camera_speed(&(app->camera), -2);
                     break;
                 case SDL_SCANCODE_E:
-                    set_car_speed_x(&(app->scene.car), 2);
-                    set_car_angle(&(app->scene.car), app->scene.car.angle += 16);
+                    set_vehicles_speed_x(&(app->scene.vehicles), 2);
+                    set_vehicles_angle(&(app->scene.vehicles), app->scene.vehicles.angle += 16);
                     break;
                 case SDL_SCANCODE_F1:
                     show_help_image();
                     break;
 					case SDL_SCANCODE_C:
-					app->camera.position.x=app->scene.car.position.x-2.5;
-					app->camera.position.y=app->scene.car.position.y+0.05;
-					app->camera.rotation.x=0.0;
-					app->camera.rotation.y=0.0;
-					app->camera.rotation.z=0.0;
+					camera_fix(app);
                     break;
                 case SDL_SCANCODE_Q:
-                    set_car_speed_x(&(app->scene.car), -2);
-                    set_car_angle(&(app->scene.car), app->scene.car.angle -= 16);
+                    set_vehicles_speed_x(&(app->scene.vehicles), -2);
+                    set_vehicles_angle(&(app->scene.vehicles), app->scene.vehicles.angle -= 16);
                     break;
                 case SDL_SCANCODE_A:
                     set_camera_side_speed(&(app->camera), 2);
@@ -195,7 +236,12 @@ while (SDL_PollEvent(&event)) {
                 case SDL_SCANCODE_KP_PLUS:
 					app->scene.lighting_level += 0.2f;
 					set_lighting(app->scene.lighting_level);
-
+                    break;
+				case SDL_SCANCODE_R:
+					app->scene.vehicles.position.x=3.0;
+					app->collision=false;
+					camera_fix(app);
+					
                     break;
                 default:
                     break;
@@ -213,7 +259,7 @@ while (SDL_PollEvent(&event)) {
                     break;
                 case SDL_SCANCODE_E:
                 case SDL_SCANCODE_Q:
-                    set_car_speed_x(&(app->scene.car), 0);
+                    set_vehicles_speed_x(&(app->scene.vehicles), 0);
                     break;
                 default:
                     break;
@@ -221,12 +267,18 @@ while (SDL_PollEvent(&event)) {
             break;
         case SDL_MOUSEBUTTONDOWN:
             is_mouse_down = true;
+			if(app->plane_start==false){
+			app->plane_start=true;
+			set_plane_speed_y(&(app->scene.vehicles), -1);
+			}
+
             break;
         case SDL_MOUSEMOTION:
             SDL_GetMouseState(&x, &y);
             if (is_mouse_down) {
                 rotate_camera(&(app->camera), mouse_x - x, mouse_y - y);
             }
+			
             mouse_x = x;
             mouse_y = y;
             break;
@@ -243,6 +295,15 @@ while (SDL_PollEvent(&event)) {
 
 }
 
+void camera_fix(App* app){
+		app->camera.position.x=app->scene.vehicles.position.x-2.5;
+		app->camera.position.y=app->scene.vehicles.position.y+0.05;
+		app->camera.rotation.x=0.0;
+		app->camera.rotation.y=0.0;
+		app->camera.rotation.z=0.0;
+}
+
+
 void update_app(App* app)
 {
     double current_time;
@@ -254,20 +315,42 @@ void update_app(App* app)
 
     update_camera(&(app->camera), elapsed_time);
     update_scene(&(app->scene), elapsed_time);
-	
-	     if(app->scene.car.position.x >= 11)
-    {
-        set_car_speed_x(&(app->scene.car), 0); 
-		//sleep(0.1);
-						time_t t1;
-		 t1 = time(0) + 3;
-		 while(  time(0) < t1)
-			 ;
-		app->scene.car.position.x-=0.3;
-    }
-	
 
-		 if(app->scene.car.position.x >=10.89)
+	if(app->scene.vehicles.p_position.y > 30.0)
+    {
+        set_plane_speed_y(&(app->scene.vehicles),0);
+		app->scene.vehicles.p_position.x=30.0;
+		app->scene.vehicles.p_position.y=-10;
+		set_plane_speed_x(&(app->scene.vehicles),-1);
+
+        set_plane_rotation_z(&(app->scene.vehicles),1.0);
+        set_plane_angle(&(app->scene.vehicles),-90.0);
+         
+    
+    } 
+		if(app->scene.vehicles.p_position.x < -30.0)
+    {
+        set_plane_speed_x(&(app->scene.vehicles),0);
+		app->scene.vehicles.p_position.x=3.0;
+		app->scene.vehicles.p_position.y=-20;
+		set_plane_speed_y(&(app->scene.vehicles),-1);
+
+        set_plane_rotation_z(&(app->scene.vehicles),1.0);
+        set_plane_angle(&(app->scene.vehicles),-180.0);
+         
+    
+    } 
+
+		 if(app->scene.vehicles.position.x >= 11)
+    {
+        set_vehicles_speed_x(&(app->scene.vehicles), 0); 
+		set_vehicles_angle(&(app->scene.vehicles), 0);
+						if(app->collision==false){
+		                    collision_image();
+							app->collision=true;
+						}
+    }
+			 if(app->scene.vehicles.position.x >10.88)
     {
 		app->scene.fog_level=0.2f;
 		
@@ -276,45 +359,81 @@ void update_app(App* app)
 		
     }
 	else{
-				app->scene.fog_level=0.0f;
-
+		app->scene.fog_level=0.0f;
 		glFogf(GL_FOG_DENSITY, app->scene.fog_level);
 		glFogfv(GL_FOG_COLOR, app->scene.fogColor);
 	}
 	
-		 if(app->camera.position.x >= 11)
+		 if(app->camera.position.x > 11)
     {
         set_camera_speed(&(app->camera), 0);
-		app->camera.position.x-=0.1;
+		app->camera.position.x-=0.127;
     }
 	
-		if(app->camera.position.x <= -11)
+	if(app->camera.position.x > app->scene.vehicles.position.x-2&&app->scene.vehicles.position.x>app->camera.position.x&&-0.1<=app->camera.position.y&&app->camera.position.y<=0.7)
     {
         set_camera_speed(&(app->camera), 0);
-		app->camera.position.x+=0.1;
+		app->camera.position.x-=0.127;
+    }
+	
+		if(app->camera.position.x < app->scene.vehicles.position.x+2&&app->scene.vehicles.position.x<app->camera.position.x&&-0.1<=app->camera.position.y&&app->camera.position.y<=0.7)
+    {
+        set_camera_speed(&(app->camera), 0);
+		app->camera.position.x+=0.127;
+    }
+	
+		if(app->camera.position.x >app->scene.vehicles.position.x-0.8&&app->camera.position.x<app->scene.vehicles.position.x+0.6&&app->camera.position.y+0.7>=app->scene.vehicles.position.y&&app->scene.vehicles.position.y+0.3>=app->camera.position.y)
+    {
+        set_camera_speed(&(app->camera), 0);
+		app->camera.position.y-=0.127;
+    }
+	
+		if(app->camera.position.x >app->scene.vehicles.position.x-0.8&&app->camera.position.x<app->scene.vehicles.position.x+0.6&&app->camera.position.y<=app->scene.vehicles.position.y+0.7&&app->scene.vehicles.position.y+0.3<=app->camera.position.y)
+    {
+        set_camera_speed(&(app->camera), 0);
+		app->camera.position.y+=0.127;
+    }
+	
+		if(app->camera.position.x < -11)
+    {
+        set_camera_speed(&(app->camera), 0);
+		app->camera.position.x+=0.127;
     }
 
-	if(app->camera.position.y <= -5)
+	if(app->camera.position.y <= -3)
     {
         set_camera_speed(&(app->camera), 0);
-		app->camera.position.y+=0.1;
+		app->camera.position.y+=0.127;
     }
 	
 	if(app->camera.position.y >= 5)
     {
         set_camera_speed(&(app->camera), 0);
-		app->camera.position.y-=0.1;
+		app->camera.position.y-=0.127;
     }
 	
 
-    if(app->scene.car.position.x < -11.0)
+    if(app->scene.vehicles.position.x <= -11.0)
     {
-        
-        set_car_speed_x(&(app->scene.car), 0);
-		app->scene.car.position.x+=0.1;
+        set_vehicles_speed_x(&(app->scene.vehicles), 0); 
+		set_vehicles_angle(&(app->scene.vehicles), 0);
+						if(app->collision==false){
+		                    collision_image();
+							app->collision=true;
+						}
+
     }
-   
-    move_car(&(app->scene.car), elapsed_time);
+	
+	if(app->scene.vehicles.position.x <-10.88)
+    {
+		app->scene.fog_level=0.2f;
+		
+		glFogf(GL_FOG_DENSITY, app->scene.fog_level);
+		glFogfv(GL_FOG_COLOR, app->scene.fogColor);
+    }
+
+    move_vehicles(&(app->scene.vehicles), elapsed_time);
+	move_plane(&(app->scene.vehicles), elapsed_time);
 }
 
 void render_app(App* app)

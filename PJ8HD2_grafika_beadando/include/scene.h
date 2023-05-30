@@ -3,25 +3,33 @@
 
 #include "camera.h"
 #include "texture.h"
-#include "car.h"
+#include "vehicles.h"
 
 
 #include <obj/model.h>
 
 typedef struct Scene
 {
-    Car car;
+    Vehicles vehicles;
 	Model tyre;
 	Model grass;
 	Model bush;
 	Model tree;
 	Model head;
 	Model windturbine;
+
+		Model stop;
+	GLuint stop_texture_id;
+	Model pedestriantable;
+	GLuint barrier_texture_id;
+	GLuint pedestriantable_texture_id;
+
+		Model barrier;
 	
 	float lighting_level;
 	float fog_level;
 	
-	float fan_rotation;
+	int fan_rotation;
     Material material;
 	GLuint tyre_texture_id;
 	GLuint fan_texture_id;
@@ -62,7 +70,7 @@ void set_material(const Material* material);
 /**
  * Update the scene.
  */
-void update_scene(Scene* scene, double times);
+void update_scene(Scene* scene, double time);
 
 /**
  * Render the scene objects.

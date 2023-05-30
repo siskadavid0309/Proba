@@ -21,7 +21,9 @@ typedef struct App
     Scene scene;
 	Objects objects;
 	GLuint texture;
-	//bool is_image_visible;
+	bool plane_start;
+	bool collision;
+
 	
 } App;
 
@@ -39,6 +41,8 @@ void init_opengl();
  * Reshape the window.
  */
 void reshape(GLsizei width, GLsizei height);
+
+void collision_image();
 
 void show_help_image();
 
